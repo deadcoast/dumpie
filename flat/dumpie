@@ -1,0 +1,115 @@
+#!/usr/bin/env python3
+"""dumpie — unpack every zip in a directory, then quarantine the originals."""
+
+import sys
+import zipfile
+import shutil
+from pathlib import Path
+
+from rich.console import Console
+from rich.prompt import Prompt
+from rich.table import Table
+from rich import box
+
+ARCHIVE_DIRNAME = "_dumped"
+
+console = Console()
+
+
+def greet() -> None:
+    console.print()
+    console.print("[bold]dumpie[/bold] [dim]·[/dim] zip dump unpacker", highlight=False)
+    console.print("[dim]feed it a directory. it unpacks every zip, then sweeps the originals aside.[/dim]")
+    console.print()
+
+
+def get_target() -> Path:
+    while True:
+        raw = Prompt.ask("[bold cyan]path[/bold cyan]").strip().strip('"').strip("'")
+        if not raw:
+            continue
+        target = Path(raw).expanduser().resolve()
+        if not target.exists():
+            console.print(f"  [red]✗[/red] no such path: [dim]{target}[/dim]")
+            continue
+        if not target.is_dir():
+            console.print(f"  [red]✗[/red] not a directory: [dim]{target}[/dim]")
+            continue
+        return target
+
+
+def unique_dir(base: Path) -> Path:
+    """Return a non-colliding directory path (name, name_2, name_3...)."""
+    if not base.exists():
+        return base
+    n = 2
+    while True:
+        candidate = base.with_name(f"{base.name}_{n}")
+        if not candidate.exists():
+            return candidate
+        n += 1
+
+
+def main() -> int:
+    greet()
+    target = get_target()
+
+    zips = sorted(p for p in target.iterdir() if p.is_file() and p.suffix.lower() == ".zip")
+    if not zips:
+        console.print(f"\n  [yellow]nothing to do[/yellow] — no zip files in [dim]{target}[/dim]\n")
+        return 0
+
+    console.print(f"\n  found [bold]{len(zips)}[/bold] zip{'s' if len(zips) != 1 else ''}\n")
+
+    archive_dir = unique_dir(target / ARCHIVE_DIRNAME)
+    archive_dir.mkdir(parents=True)
+
+    results = []  # (name, status, detail)
+
+    with console.status("[bold]unpacking...[/bold]", spinner="dots"):
+        for zp in zips:
+            dest = unique_dir(target / zp.stem)
+            try:
+                with zipfile.ZipFile(zp) as zf:
+                    bad = zf.testzip()
+                    if bad is not None:
+                        raise zipfile.BadZipFile(f"corrupt member: {bad}")
+                    dest.mkdir(parents=True)
+                    zf.extractall(dest)
+                shutil.move(str(zp), archive_dir / zp.name)
+                results.append((zp.name, True, dest.name + "/"))
+                console.print(f"  [green]✓[/green] {zp.name} [dim]→ {dest.name}/[/dim]")
+            except (zipfile.BadZipFile, OSError) as e:
+                if dest.exists() and not any(dest.iterdir()):
+                    dest.rmdir()
+                results.append((zp.name, False, str(e)))
+                console.print(f"  [red]✗[/red] {zp.name} [dim]{e}[/dim]")
+
+    ok = sum(1 for _, s, _ in results if s)
+    failed = len(results) - ok
+
+    # If nothing succeeded, the archive dir is empty — remove it.
+    if ok == 0 and not any(archive_dir.iterdir()):
+        archive_dir.rmdir()
+
+    table = Table(box=box.SIMPLE, show_header=False, pad_edge=False)
+    table.add_column(style="dim", justify="right")
+    table.add_column()
+    table.add_row("unpacked", f"[green]{ok}[/green]" + (f"  [red]{failed} failed[/red]" if failed else ""))
+    table.add_row("source", str(target))
+    if ok:
+        table.add_row("archived zips", str(archive_dir))
+
+    console.print()
+    console.print("[bold green]complete[/bold green]" if not failed else "[bold yellow]complete with errors[/bold yellow]")
+    console.print(table)
+    console.print()
+    return 0 if not failed else 1
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        console.print("\n[dim]aborted[/dim]")
+        sys.exit(130)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""dumpie — unpack every zip in a directory, then quarantine the originals."""
+"""dumpie — unpack every zip under a directory, then quarantine the originals."""
 
 import sys
 import zipfile
@@ -19,7 +19,7 @@ console = Console()
 def greet() -> None:
     console.print()
     console.print("[bold]dumpie[/bold] [dim]·[/dim] zip dump unpacker", highlight=False)
-    console.print("[dim]feed it a directory. it unpacks every zip, then sweeps the originals aside.[/dim]")
+    console.print("[dim]feed it a directory. it unpacks every zip beneath it, then sweeps the originals aside.[/dim]")
     console.print()
 
 
@@ -50,13 +50,28 @@ def unique_dir(base: Path) -> Path:
         n += 1
 
 
+def collect_zips(target: Path) -> list[Path]:
+    """All zips under target, recursive. Skips any prior _dumped* archives."""
+    found = []
+    for p in sorted(target.rglob("*")):
+        if not (p.is_file() and p.suffix.lower() == ".zip"):
+            continue
+        rel_parts = p.relative_to(target).parts
+        if any(part.startswith(ARCHIVE_DIRNAME) for part in rel_parts[:-1]):
+            continue
+        found.append(p)
+    return found
+
+
 def main() -> int:
     greet()
     target = get_target()
 
-    zips = sorted(p for p in target.iterdir() if p.is_file() and p.suffix.lower() == ".zip")
+    # Snapshot before extracting — zips nested inside archives we unpack
+    # mid-run are not part of this pass.
+    zips = collect_zips(target)
     if not zips:
-        console.print(f"\n  [yellow]nothing to do[/yellow] — no zip files in [dim]{target}[/dim]\n")
+        console.print(f"\n  [yellow]nothing to do[/yellow] — no zip files under [dim]{target}[/dim]\n")
         return 0
 
     console.print(f"\n  found [bold]{len(zips)}[/bold] zip{'s' if len(zips) != 1 else ''}\n")
@@ -64,11 +79,12 @@ def main() -> int:
     archive_dir = unique_dir(target / ARCHIVE_DIRNAME)
     archive_dir.mkdir(parents=True)
 
-    results = []  # (name, status, detail)
+    ok = failed = 0
 
     with console.status("[bold]unpacking...[/bold]", spinner="dots"):
         for zp in zips:
-            dest = unique_dir(target / zp.stem)
+            rel = zp.relative_to(target)
+            dest = unique_dir(zp.parent / zp.stem)
             try:
                 with zipfile.ZipFile(zp) as zf:
                     bad = zf.testzip()
@@ -76,19 +92,19 @@ def main() -> int:
                         raise zipfile.BadZipFile(f"corrupt member: {bad}")
                     dest.mkdir(parents=True)
                     zf.extractall(dest)
-                shutil.move(str(zp), archive_dir / zp.name)
-                results.append((zp.name, True, dest.name + "/"))
-                console.print(f"  [green]✓[/green] {zp.name} [dim]→ {dest.name}/[/dim]")
+                # Mirror the relative structure inside the archive dir so
+                # same-named zips from different subdirs never collide.
+                slot = archive_dir / rel
+                slot.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(zp), slot)
+                ok += 1
+                console.print(f"  [green]✓[/green] {rel} [dim]→ {dest.relative_to(target)}/[/dim]")
             except (zipfile.BadZipFile, OSError) as e:
                 if dest.exists() and not any(dest.iterdir()):
                     dest.rmdir()
-                results.append((zp.name, False, str(e)))
-                console.print(f"  [red]✗[/red] {zp.name} [dim]{e}[/dim]")
+                failed += 1
+                console.print(f"  [red]✗[/red] {rel} [dim]{e}[/dim]")
 
-    ok = sum(1 for _, s, _ in results if s)
-    failed = len(results) - ok
-
-    # If nothing succeeded, the archive dir is empty — remove it.
     if ok == 0 and not any(archive_dir.iterdir()):
         archive_dir.rmdir()
 

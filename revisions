@@ -1,0 +1,21 @@
+# REVISIONS AND ADDITIONS
+
+> CURRENT STATE
+The current CLI application is tested and operational. The extraction features work great. Now is the time to add some quality of life and additional features, without bloating the applications SURFACE. Additional features that are niche are approved, but NOT AT SURFACE LEVEL. The surface or "landing" page of the CLI (after running 'dumpie') should always be the essentials. Currently the cli posts a greeting to the user, and requests a path. ONLY main features here; all others should be in a submenu so the core function is not deep in the menus.
+
+## FLATTEN FEATURE
+
+- Provide a feature that will flatten a directory so that ONLY the files from the zips are left (aswell as the _dumped archive folder that is created when a dumpie extraction run is complete, that is where the archived zips are moved.)
+- The goal of this feature is to provide an option to flatten the directory DURING the extraction, or after a default run is completed and the user changes their mind. (Default is the current functions, creating a folder with the same title as the zip archive it is extracting)
+- THIS IS AN APPROVED SURFACE (LANDING PAGE) LEVEL FUNCTION FOR THE CLI.
+
+## LANDING PAGE TWEAKS
+
+- The above addition will require us to now provide a cli menu with minimal options on the surface.
+
+1. Greet the User (Provide a stylized greeting, be creative and sharp. Dont be lazy.)
+2. Flat dumpie (Extract all files into the path extracting from)
+3. Modular dumpie (Retains title/structure by creating directory's with the same title as zips)
+4. Options (Futureproofing for future additions and features)
+
+---
