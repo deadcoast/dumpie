@@ -6,14 +6,14 @@ Interactive CLI that recursively unpacks every zip under a directory, then sweep
 
 ## Quick run
 
-**macOS / Linux / WSL**
 ```bash
+# macOS / Linux / WSL
 bash install.sh   # once
 dumpie            # any new terminal
 ```
 
-**Windows (PowerShell)**
 ```powershell
+# Windows (PowerShell)
 powershell -ExecutionPolicy Bypass -File .\install.ps1   # once
 dumpie                                                   # any new terminal
 ```
@@ -24,7 +24,7 @@ Then `dumpie` greets you and shows a short menu. Pick a number, give it a path, 
 
 ## The menu
 
-```
+```bash
   ▌ dumpie · zip-dump unpacker
   hand it a folder full of zips. it unpacks them and sweeps the originals aside.
 
@@ -46,7 +46,7 @@ In every mode the originals are swept into a single `_dumped/` folder at the roo
 
 ## Example — modular
 
-```
+```plaintext
 Before                          After
 dump/                           dump/
 ├── alpha.zip                   ├── alpha/              ← unpacked
@@ -63,7 +63,7 @@ dump/                           dump/
 
 ## Example — flat
 
-```
+```plaintext
 Before                          After
 dump/                           dump/
 ├── photos.zip                  ├── a.png               ← from photos.zip (img/a.png)
@@ -134,13 +134,13 @@ Re-run the installer. It overwrites the program in place and refreshes dependenc
 
 ## Uninstall
 
-**macOS / Linux / WSL**
 ```bash
+# macOS / Linux / WSL
 rm -rf ~/.local/share/dumpie ~/.local/bin/dumpie
 ```
 
-**Windows**
 ```powershell
+# Windows
 Remove-Item -Recurse -Force "$env:LOCALAPPDATA\dumpie"
 ```
 The `PATH` entry is harmless if left; remove the `...\dumpie\bin` entry via *Settings → Environment Variables* if you want it gone.

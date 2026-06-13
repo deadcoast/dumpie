@@ -1,0 +1,14 @@
+~ via v25.8.1
+❯ dumpie
+
+  â–Œ dumpie Â· zip-dump unpacker
+  hand it a folder full of zips. it unpacks them and sweeps the originals aside.
+
+  what now?
+
+   1  flat dumpie     unpack everything into the folder, no subfolders
+   2  modular dumpie  a folder per zip â€” keeps structure
+   3  options
+   q  quit
+
+  â€º (1):

@@ -59,6 +59,7 @@ import argparse
 import enum
 import os
 import shutil
+import sys
 import zipfile
 
 __version__ = "0.2.0"
@@ -122,6 +123,33 @@ def listdir_names(target: Path) -> list[str]:
 
 
 # ── ui ────────────────────────────────────────────────────────
+def _enable_windows_utf8() -> None:
+    """Align Windows' console code page and Python's streams to UTF-8.
+
+    Without this, dumpie's UTF-8 output (▌ · › — ✓) is decoded through the
+    legacy Windows-1252 code page and shows up as mojibake (``â–Œ``, ``Â·``).
+    Switching the console to code page 65001 and reconfiguring stdio to UTF-8
+    makes what we emit and what the console reads agree. No-op off Windows, and
+    best-effort everywhere (a redirected pipe or unusual host just falls back).
+    """
+    if sys.platform == "win32":
+        try:
+            import ctypes
+
+            kernel32 = ctypes.windll.kernel32
+            kernel32.SetConsoleOutputCP(65001)
+            kernel32.SetConsoleCP(65001)
+        except Exception:
+            pass
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
+        except (AttributeError, OSError, ValueError):
+            pass
+
+
+_enable_windows_utf8()
+
 THEME = Theme(
     {
         "accent": "bold cyan",
@@ -533,7 +561,7 @@ Set-Content -Path $appPy -Value $source -Encoding UTF8
 
 # 4. launcher shim on PATH (works from cmd AND PowerShell)
 $shim = Join-Path $binDir "dumpie.cmd"
-$shimBody = "@echo off`r`n`"$venvPy`" `"$appPy`" %*"
+$shimBody = "@echo off`r`nset PYTHONUTF8=1`r`n`"$venvPy`" `"$appPy`" %*"
 Set-Content -Path $shim -Value $shimBody -Encoding ASCII
 
 # 5. add the shim dir to the user PATH if it's not there
