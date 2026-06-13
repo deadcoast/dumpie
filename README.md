@@ -1,6 +1,6 @@
 # dumpie
 
-Interactive CLI that recursively unpacks every zip under a directory, then sweeps the originals into a single archive folder. Point it at a path full of zips, and it does the rest.
+Interactive CLI that recursively unpacks every zip under a directory, then sweeps the originals into a single archive folder. Point it at a path full of zips and pick how you want them laid out — **flat** (every file loose) or **modular** (a folder per zip).
 
 ---
 
@@ -8,89 +8,98 @@ Interactive CLI that recursively unpacks every zip under a directory, then sweep
 
 **macOS / Linux / WSL**
 ```bash
-bash install_dumpie.sh   # once
-dumpie                   # any new terminal
+bash install.sh   # once
+dumpie            # any new terminal
 ```
 
 **Windows (PowerShell)**
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\install_dumpie.ps1   # once
-dumpie                                                          # any new terminal
+powershell -ExecutionPolicy Bypass -File .\install.ps1   # once
+dumpie                                                   # any new terminal
 ```
 
-Then `dumpie` greets you, asks for a path, and unpacks everything. That's the whole flow.
+Then `dumpie` greets you and shows a short menu. Pick a number, give it a path, done.
 
 ---
 
-## What it does
-
-Given a directory, dumpie:
-
-1. Finds **every** `.zip` beneath the path, recursively — not just the top level.
-2. Extracts each one into a folder of the same name, right next to where the zip lived (`sub/deep/foo.zip` → `sub/deep/foo/`).
-3. Moves every successfully-unpacked zip into a single `_dumped/` folder at the root of the path, mirroring the original subfolder structure so same-named zips never collide.
-4. Confirms completion, printing both the path you gave it and the path to the archived zips.
-
-Corrupt or unreadable zips are left exactly where they are — `_dumped/` means "verified and processed," so anything that failed stays visible in place for you to deal with.
-
-## Example
+## The menu
 
 ```
-$ dumpie
+  ▌ dumpie · zip-dump unpacker
+  hand it a folder full of zips. it unpacks them and sweeps the originals aside.
 
-dumpie · zip dump unpacker
-feed it a directory. it unpacks every zip beneath it, then sweeps the originals aside.
+  what now?
 
-path: ~/Downloads/dump
-
-  found 4 zips
-
-  ✓ alpha.zip       → alpha/
-  ✓ sub/beta.zip    → sub/beta/
-  ✗ broken.zip      File is not a zip file
-  ✓ gamma.zip       → gamma/
-
-complete with errors
-      unpacked   3  1 failed
-        source   /Users/you/Downloads/dump
- archived zips   /Users/you/Downloads/dump/_dumped
+   1  flat dumpie     unpack everything into the folder, no subfolders
+   2  modular dumpie  a folder per zip — keeps structure
+   3  options
+   q  quit
 ```
 
-Before:
+- **flat dumpie** — unpacks every zip and drops all the files straight into the folder, discarding the folders *inside* each zip. Two files that would land on the same name are auto-numbered (`a.png`, `a_2.png`, …) so nothing is ever overwritten or lost.
+- **modular dumpie** — unpacks each zip into a folder of its own name, right where the zip lived (`sub/deep/foo.zip` → `sub/deep/foo/`), keeping each archive's internal structure.
+- **options** — the less-common tools, kept off the main surface:
+  - **flatten an existing directory** — already ran modular and changed your mind? This collapses an already-unpacked folder down to files only, same auto-numbering, leaving `_dumped/` untouched.
+  - **about**
+
+In every mode the originals are swept into a single `_dumped/` folder at the root of the path. Corrupt or unreadable zips are left exactly where they are — `_dumped/` means "verified and processed," so anything that failed stays visible in place for you to deal with.
+
+## Example — modular
+
 ```
-dump/
-├── alpha.zip
-├── broken.zip
-├── gamma.zip
-└── sub/
-    └── beta.zip
+Before                          After
+dump/                           dump/
+├── alpha.zip                   ├── alpha/              ← unpacked
+├── broken.zip                  ├── gamma/              ← unpacked
+├── gamma.zip                   ├── broken.zip          ← left in place (failed)
+└── sub/                        ├── sub/
+    └── beta.zip                │   └── beta/           ← unpacked
+                                └── _dumped/            ← originals, structure mirrored
+                                    ├── alpha.zip
+                                    ├── gamma.zip
+                                    └── sub/
+                                        └── beta.zip
 ```
 
-After:
+## Example — flat
+
 ```
-dump/
-├── alpha/              ← unpacked
-├── gamma/              ← unpacked
-├── broken.zip          ← left in place (failed)
-├── sub/
-│   └── beta/           ← unpacked
-└── _dumped/            ← originals swept here, structure mirrored
-    ├── alpha.zip
-    ├── gamma.zip
-    └── sub/
-        └── beta.zip
+Before                          After
+dump/                           dump/
+├── photos.zip                  ├── a.png               ← from photos.zip (img/a.png)
+│     └ img/a.png               ├── b.png               ← from photos.zip (img/b.png)
+│     └ img/b.png               ├── a_2.png             ← from icons.zip (a.png) — auto-numbered
+└── icons.zip                   └── _dumped/
+      └ a.png                       ├── photos.zip
+                                    └── icons.zip
 ```
+
+---
+
+## Power-user flags
+
+The menu is the whole experience; you never need flags. But for scripting or CI, every mode is reachable directly:
+
+```bash
+dumpie --flat    <path>   # flat unpack
+dumpie --modular <path>   # modular unpack
+dumpie --flatten <path>   # flatten an already-unpacked folder
+dumpie --dry-run --flat <path>   # show the plan, write nothing
+dumpie --version
+```
+
+Exit code is `0` when everything unpacked cleanly, `1` if any zip failed, `2` for a bad path argument.
 
 ---
 
 ## Install (full)
 
-The installer is a single self-contained file — the dumpie program is embedded inside it, so it's the only thing you need to download. Running it does four things:
+The installer is a single self-contained file — the dumpie program is embedded inside it, so it's the only thing you need to download. Running it:
 
 - Creates a **private Python virtual environment** just for dumpie, so it never touches your system Python or any other project's packages.
 - Installs dumpie's one dependency ([Rich](https://github.com/Textualize/rich), for the colored output) into that environment.
 - Drops the dumpie program and a small launcher.
-- Adds the launcher to your `PATH` so `dumpie` works as a plain command — no typing `python`, no long command strings.
+- Adds the launcher to your `PATH` so `dumpie` works as a plain command.
 
 ### Requirements
 
@@ -104,44 +113,18 @@ If Python is missing, the installer stops and tells you exactly what to install.
 ### macOS / Linux / WSL
 
 ```bash
-bash install_dumpie.sh
+bash install.sh
 ```
 
-Files land in:
-- `~/.local/share/dumpie/` — the program and its venv
-- `~/.local/bin/dumpie` — the launcher
-
-If `~/.local/bin` isn't already on your `PATH`, the installer appends it to the right shell config (`.zshrc`, `.bashrc`, or `.profile`) and tells you to open a new terminal once.
+Files land in `~/.local/share/dumpie/` (program + venv) and `~/.local/bin/dumpie` (launcher). If `~/.local/bin` isn't on your `PATH`, the installer appends it to the right shell config and tells you to open a new terminal once.
 
 ### Windows
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\install_dumpie.ps1
+powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
-Files land in:
-- `%LOCALAPPDATA%\dumpie\` — the program and its venv
-- `%LOCALAPPDATA%\dumpie\bin\dumpie.cmd` — the launcher (works in both PowerShell and cmd)
-
-The launcher folder is added to your **user** `PATH` (no admin needed). It works immediately in the window you ran the installer from; other already-open terminals need to be restarted.
-
----
-
-## Usage
-
-1. Type `dumpie`.
-2. At the `path:` prompt, type or paste a directory path and press Enter. Quoted and drag-and-dropped paths are handled automatically.
-3. dumpie unpacks everything and prints a summary.
-
-If you point it at a directory with no zips, it says so and exits without creating anything.
-
-### Re-running on the same folder
-
-Safe. dumpie ignores its own `_dumped/` archives on subsequent runs, so pointing it at an already-processed folder only picks up zips you've added since (or ones that failed last time).
-
-### Collisions
-
-If a destination folder already exists, dumpie extracts to a numbered variant (`alpha/` → `alpha_2/`) rather than overwriting. The same applies to the `_dumped/` folder itself.
+Files land in `%LOCALAPPDATA%\dumpie\` (program + venv) and `%LOCALAPPDATA%\dumpie\bin\dumpie.cmd` (launcher, works in PowerShell and cmd). The launcher folder is added to your **user** `PATH` (no admin needed).
 
 ---
 
@@ -160,13 +143,27 @@ rm -rf ~/.local/share/dumpie ~/.local/bin/dumpie
 ```powershell
 Remove-Item -Recurse -Force "$env:LOCALAPPDATA\dumpie"
 ```
-The `PATH` entry is harmless if left, but you can remove the `...\dumpie\bin` entry from your user PATH via *Settings → Environment Variables* if you want it gone.
+The `PATH` entry is harmless if left; remove the `...\dumpie\bin` entry via *Settings → Environment Variables* if you want it gone.
 
 ---
 
 ## Notes & limitations
 
-- **Exit codes:** `0` if everything unpacked cleanly, `1` if any zip failed (useful for scripting).
-- **Recursion snapshot:** dumpie lists all zips *before* it starts extracting, so a zip that only appears after another is unpacked is not pulled into the same run. Run it again to catch those.
-- **Long paths (Windows):** very deeply nested archives can exceed the legacy 260-character path limit on older Windows configurations. If you hit this, enable long-path support in Windows, or extract closer to the drive root.
+- **Re-running is safe.** dumpie ignores its own `_dumped/` archives, so pointing it at an already-processed folder only picks up zips you've added since (or ones that failed last time).
+- **Collisions never overwrite.** Modular destinations that already exist get a numbered variant (`alpha/` → `alpha_2/`); flat/flatten files get a numbered variant (`a.png` → `a_2.png`).
+- **Recursion snapshot:** dumpie lists all zips *before* it starts, so a zip that only appears after another is unpacked is not pulled into the same run. Run it again to catch those.
+- **Long paths (Windows):** very deeply nested archives can exceed the legacy 260-character path limit on older Windows configurations. Enable long-path support, or extract closer to the drive root.
 - **Supported archives:** `.zip` only. No `.7z` / `.rar` / `.tar` (yet).
+
+---
+
+## Development
+
+The program is developed as a small package under `src/dumpie/` (one module per concern: `cli`, `menu`, `extract`, `flatten`, `fsutil`, `ui`). What ships is a single file — `build.py` amalgamates the package into the root `dumpie` script and embeds that same source into both installers, so source, script, and installers never drift.
+
+```bash
+python build.py                  # rebuild dumpie + installers from src/
+uv run --group dev pytest -q     # run the test suite
+```
+
+A test asserts the installers contain the current amalgamated source, so it fails if you edit `src/dumpie/` without re-running `build.py`.

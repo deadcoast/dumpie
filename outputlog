@@ -1,0 +1,559 @@
+
+Building now. Creating the modular package under src/dumpie/, the build script that bakes it into the single-file installer, tests, and updated docs.
+
+● Write(src\dumpie\__init__.py)
+Wrote 3 lines to src\dumpie\__init__.py
+"""dumpie — unpack every zip under a folder, then quarantine the originals."""
+
+__version__ = "0.2.0"
+
+● Write(src\dumpie\fsutil.py)
+Wrote 62 lines to src\dumpie\fsutil.py
+""Filesystem helpers shared across dumpie: archive naming and collision-free names."""
+
+rom __future__ import annotations
+
+mport os
+rom pathlib import Path, PurePosixPath
+rom typing import Iterable
+
+RCHIVE_DIRNAME = "_dumped"
+… +52 lines
+
+● Write(src\dumpie\ui.py)
+Wrote 42 lines to src\dumpie\ui.py
+"""Console, theme, greeting, and shared result rendering for dumpie's interface."""
+
+from __future__ import annotations
+
+from rich import box
+from rich.console import Console
+from rich.table import Table
+from rich.theme import Theme
+
+THEME = Theme(
+… +32 lines
+
+● Write(src\dumpie\extract.py)
+Wrote 170 lines to src\dumpie\extract.py
+"""Core extraction: discover zips, unpack in modular or flat mode, sweep originals."""
+
+from __future__ import annotations
+
+import enum
+import shutil
+import zipfile
+from pathlib import Path
+
+from .fsutil import ARCHIVE_DIRNAME, NameAllocator, listdir_names, unique_dir
+… +160 lines
+
+● Write(src\dumpie\flatten.py)
+Wrote 99 lines to src\dumpie\flatten.py
+""Flatten an already-extracted directory down to files only, archive preserved."""
+
+rom __future__ import annotations
+
+mport shutil
+rom pathlib import Path
+
+rom .fsutil import ARCHIVE_DIRNAME, NameAllocator, listdir_names
+rom .ui import console, summary
+… +89 lines
+
+● Write(src\dumpie\menu.py)
+Wrote 80 lines to src\dumpie\menu.py
+"""Interactive landing page and Options submenu — dumpie's primary surface."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from rich.prompt import Prompt
+
+from . import __version__
+from .extract import Mode, run
+… +70 lines
+
+● Write(src\dumpie\cli.py)
+Wrote 55 lines to src\dumpie\cli.py
+"""Command-line entry: open the menu by default, or run one mode directly from flags."""
+
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
+from . import __version__
+from .extract import Mode, run
+from .flatten import flatten_directory
+… +45 lines
+
+● Write(src\dumpie\__main__.py)
+Wrote 15 lines to src\dumpie\__main__.py
+"""Allow ``python -m dumpie`` to launch the CLI."""
+
+from __future__ import annotations
+
+import sys
+
+from .cli import main
+from .ui import console
+
+if __name__ == "__main__":
+… +5 lines
+
+Now the build script that bakes the package into the single-file installer:
+
+● Write(build.py)
+Wrote 138 lines to build.py
+#!/usr/bin/env python3
+"""Bake the dumpie package into a single self-contained file and refresh installers.
+
+Development happens in ``src/dumpie/`` as clean modules. What a user installs and
+runs is one file. This script amalgamates the package into that file and embeds it
+into ``install.sh`` and ``install.ps1`` so source, the shipped script, and both
+installers never drift. Run it after changing anything under ``src/dumpie/``:
+
+    python build.py
+"""
+… +128 lines
+
+Now run the build to generate the single-file dumpie and re-embed it into both installers:
+
+  Ran 1 shell command
+
+Build succeeded (files were written); only the final print choked on the cp1252 console. Let me fix that to plain ASCII.
+
+
+● Update(build.py)
+Added 1 line, removed 1 line
+        encoding="utf-8",
+    )
+
+    print(f"baked dumpie v{_read_version()} → dumpie, install.sh, install.ps1")
+    print(f"baked dumpie v{_read_version()} -> dumpie, install.sh, install.ps1")
+    return 0
+
+
+
+  Ran 1 shell command
+
+Generated cleanly and compiles. Now the test suite and pytest config.
+
+● Update(pyproject.toml)
+Added 11 lines, removed 2 lines
+[project]
+name = "unpackzip"
+version = "0.1.0"
+description = "Add your description here"
+version = "0.2.0"
+description = "Interactive CLI that unpacks every zip under a folder — flat or modular — then quarantines the originals."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "rich>=15.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "."]
+testpaths = ["tests"]
+
+● Write(tests\conftest.py)
+Wrote 23 lines to tests\conftest.py
+""Shared test fixtures for dumpie."""
+
+rom __future__ import annotations
+
+mport zipfile
+rom pathlib import Path
+
+mport pytest
+
+… +13 lines
+
+● Write(tests\test_fsutil.py)
+Wrote 41 lines to tests\test_fsutil.py
+"""Tests for collision-free name allocation and directory uniqueness."""
+
+from __future__ import annotations
+
+from dumpie.fsutil import NameAllocator, _split_name, unique_dir
+
+
+def test_allocator_passes_through_unique():
+    alloc = NameAllocator()
+    assert alloc.take("x.txt") == ("x.txt", False)
+… +31 lines
+
+● Write(tests\test_extract.py)
+Wrote 69 lines to tests\test_extract.py
+"""Tests for zip discovery and modular/flat extraction."""
+
+from __future__ import annotations
+
+import zipfile
+
+from dumpie.extract import Mode, collect_zips, run
+
+
+def test_modular_run_keeps_structure(tmp_path, mkzip):
+… +59 lines
+
+● Write(tests\test_flatten.py)
+Wrote 61 lines to tests\test_flatten.py
+"""Tests for flattening an already-extracted directory."""
+
+from __future__ import annotations
+
+from dumpie.flatten import flatten_directory
+
+
+def test_flatten_moves_nested_files_up(tmp_path):
+    (tmp_path / "alpha").mkdir()
+    (tmp_path / "alpha" / "a.txt").write_text("A")
+… +51 lines
+
+● Write(tests\test_cli.py)
+Wrote 52 lines to tests\test_cli.py
+""Tests for argument parsing and dispatch."""
+
+rom __future__ import annotations
+
+mport pytest
+
+rom dumpie import cli
+rom dumpie.extract import Mode
+
+… +42 lines
+
+● Write(tests\test_build.py)
+Wrote 55 lines to tests\test_build.py
+""Tests for the amalgamator and installer/source synchronization."""
+
+rom __future__ import annotations
+
+mport os
+mport subprocess
+mport sys
+mport zipfile
+rom pathlib import Path
+… +45 lines
+
+Now run the full suite:
+
+  Ran 1 shell command
+
+All 28 pass — including the subprocess smoke tests that run the generated single-file dumpie end-to-end through Rich. Let me smoke the interactive menu (pipe q to quit) and confirm the installers are still structurally intact after re-embedding.
+
+  Ran 1 shell command
+
+Menu renders, quits cleanly, installer launcher logic intact. Let me verify the embedded block boundaries inside install.sh are correct (the DUMPIE_EOF terminator landed on its own line, followed by the launcher).
+
+  Searched for 1 pattern
+
+Markers are clean (DUMPIE_EOF and '@ both at column 0, launcher follows). Now update the README to match the new surface, fix the installer filenames it references, and remove the stale flat/ copy.
+
+  Ran 1 shell command
+
+● Write(README.md)
+Added 83 lines, removed 86 lines
+# dumpie
+
+Interactive CLI that recursively unpacks every zip under a directory, then sweeps the originals into a single archive folder. Point it at a path full of zips, and it does the rest.
+Interactive CLI that recursively unpacks every zip under a directory, then sweeps the originals into a single archive folder. Point it at a path full of zips and pick how you want them laid out — **flat** (every file loose) or **modular** (a folder per
+zip).
+
+---
+
+
+
+**macOS / Linux / WSL**
+```bash
+bash install_dumpie.sh   # once
+dumpie                   # any new terminal
+bash install.sh   # once
+dumpie            # any new terminal
+```
+
+**Windows (PowerShell)**
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install_dumpie.ps1   # once
+dumpie                                                          # any new terminal
+powershell -ExecutionPolicy Bypass -File .\install.ps1   # once
+dumpie                                                   # any new terminal
+```
+
+Then `dumpie` greets you, asks for a path, and unpacks everything. That's the whole flow.
+Then `dumpie` greets you and shows a short menu. Pick a number, give it a path, done.
+
+---
+
+## What it does
+## The menu
+
+Given a directory, dumpie:
+```
+  ▌ dumpie · zip-dump unpacker
+  hand it a folder full of zips. it unpacks them and sweeps the originals aside.
+
+1. Finds **every** `.zip` beneath the path, recursively — not just the top level.
+2. Extracts each one into a folder of the same name, right next to where the zip lived (`sub/deep/foo.zip` → `sub/deep/foo/`).
+3. Moves every successfully-unpacked zip into a single `_dumped/` folder at the root of the path, mirroring the original subfolder structure so same-named zips never collide.
+4. Confirms completion, printing both the path you gave it and the path to the archived zips.
+  what now?
+
+Corrupt or unreadable zips are left exactly where they are — `_dumped/` means "verified and processed," so anything that failed stays visible in place for you to deal with.
+
+## Example
+
+   1  flat dumpie     unpack everything into the folder, no subfolders
+   2  modular dumpie  a folder per zip — keeps structure
+   3  options
+   q  quit
+```
+$ dumpie
+
+dumpie · zip dump unpacker
+feed it a directory. it unpacks every zip beneath it, then sweeps the originals aside.
+- **flat dumpie** — unpacks every zip and drops all the files straight into the folder, discarding the folders *inside* each zip. Two files that would land on the same name are auto-numbered (`a.png`, `a_2.png`, …) so nothing is ever overwritten or lo
+st.
+- **modular dumpie** — unpacks each zip into a folder of its own name, right where the zip lived (`sub/deep/foo.zip` → `sub/deep/foo/`), keeping each archive's internal structure.
+- **options** — the less-common tools, kept off the main surface:
+  - **flatten an existing directory** — already ran modular and changed your mind? This collapses an already-unpacked folder down to files only, same auto-numbering, leaving `_dumped/` untouched.
+  - **about**
+
+path: ~/Downloads/dump
+In every mode the originals are swept into a single `_dumped/` folder at the root of the path. Corrupt or unreadable zips are left exactly where they are — `_dumped/` means "verified and processed," so anything that failed stays visible in place for y
+ou to deal with.
+
+  found 4 zips
+## Example — modular
+
+  ✓ alpha.zip       → alpha/
+  ✓ sub/beta.zip    → sub/beta/
+  ✗ broken.zip      File is not a zip file
+  ✓ gamma.zip       → gamma/
+
+complete with errors
+      unpacked   3  1 failed
+        source   /Users/you/Downloads/dump
+ archived zips   /Users/you/Downloads/dump/_dumped
+```
+Before                          After
+dump/                           dump/
+├── alpha.zip                   ├── alpha/              ← unpacked
+├── broken.zip                  ├── gamma/              ← unpacked
+├── gamma.zip                   ├── broken.zip          ← left in place (failed)
+└── sub/                        ├── sub/
+    └── beta.zip                │   └── beta/           ← unpacked
+                                └── _dumped/            ← originals, structure mirrored
+                                    ├── alpha.zip
+                                    ├── gamma.zip
+                                    └── sub/
+                                        └── beta.zip
+```
+
+Before:
+## Example — flat
+
+```
+dump/
+├── alpha.zip
+├── broken.zip
+├── gamma.zip
+└── sub/
+    └── beta.zip
+Before                          After
+dump/                           dump/
+├── photos.zip                  ├── a.png               ← from photos.zip (img/a.png)
+│     └ img/a.png               ├── b.png               ← from photos.zip (img/b.png)
+│     └ img/b.png               ├── a_2.png             ← from icons.zip (a.png) — auto-numbered
+└── icons.zip                   └── _dumped/
+      └ a.png                       ├── photos.zip
+                                    └── icons.zip
+```
+
+After:
+---
+
+## Power-user flags
+
+The menu is the whole experience; you never need flags. But for scripting or CI, every mode is reachable directly:
+
+```bash
+dumpie --flat    <path>   # flat unpack
+dumpie --modular <path>   # modular unpack
+dumpie --flatten <path>   # flatten an already-unpacked folder
+dumpie --dry-run --flat <path>   # show the plan, write nothing
+dumpie --version
+```
+dump/
+├── alpha/              ← unpacked
+├── gamma/              ← unpacked
+├── broken.zip          ← left in place (failed)
+├── sub/
+│   └── beta/           ← unpacked
+└── _dumped/            ← originals swept here, structure mirrored
+    ├── alpha.zip
+    ├── gamma.zip
+    └── sub/
+        └── beta.zip
+```
+
+Exit code is `0` when everything unpacked cleanly, `1` if any zip failed, `2` for a bad path argument.
+
+---
+
+## Install (full)
+
+The installer is a single self-contained file — the dumpie program is embedded inside it, so it's the only thing you need to download. Running it does four things:
+The installer is a single self-contained file — the dumpie program is embedded inside it, so it's the only thing you need to download. Running it:
+
+- Creates a **private Python virtual environment** just for dumpie, so it never touches your system Python or any other project's packages.
+- Installs dumpie's one dependency ([Rich](https://github.com/Textualize/rich), for the colored output) into that environment.
+- Drops the dumpie program and a small launcher.
+- Adds the launcher to your `PATH` so `dumpie` works as a plain command — no typing `python`, no long command strings.
+- Adds the launcher to your `PATH` so `dumpie` works as a plain command.
+
+### Requirements
+
+
+### macOS / Linux / WSL
+
+```bash
+bash install_dumpie.sh
+bash install.sh
+```
+
+Files land in:
+- `~/.local/share/dumpie/` — the program and its venv
+- `~/.local/bin/dumpie` — the launcher
+Files land in `~/.local/share/dumpie/` (program + venv) and `~/.local/bin/dumpie` (launcher). If `~/.local/bin` isn't on your `PATH`, the installer appends it to the right shell config and tells you to open a new terminal once.
+
+If `~/.local/bin` isn't already on your `PATH`, the installer appends it to the right shell config (`.zshrc`, `.bashrc`, or `.profile`) and tells you to open a new terminal once.
+
+### Windows
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install_dumpie.ps1
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+```
+
+Files land in:
+- `%LOCALAPPDATA%\dumpie\` — the program and its venv
+- `%LOCALAPPDATA%\dumpie\bin\dumpie.cmd` — the launcher (works in both PowerShell and cmd)
+Files land in `%LOCALAPPDATA%\dumpie\` (program + venv) and `%LOCALAPPDATA%\dumpie\bin\dumpie.cmd` (launcher, works in PowerShell and cmd). The launcher folder is added to your **user** `PATH` (no admin needed).
+
+The launcher folder is added to your **user** `PATH` (no admin needed). It works immediately in the window you ran the installer from; other already-open terminals need to be restarted.
+
+---
+
+## Usage
+
+1. Type `dumpie`.
+2. At the `path:` prompt, type or paste a directory path and press Enter. Quoted and drag-and-dropped paths are handled automatically.
+3. dumpie unpacks everything and prints a summary.
+
+If you point it at a directory with no zips, it says so and exits without creating anything.
+
+### Re-running on the same folder
+
+Safe. dumpie ignores its own `_dumped/` archives on subsequent runs, so pointing it at an already-processed folder only picks up zips you've added since (or ones that failed last time).
+
+### Collisions
+
+If a destination folder already exists, dumpie extracts to a numbered variant (`alpha/` → `alpha_2/`) rather than overwriting. The same applies to the `_dumped/` folder itself.
+
+---
+
+## Updating
+
+Re-run the installer. It overwrites the program in place and refreshes dependencies.
+
+```powershell
+Remove-Item -Recurse -Force "$env:LOCALAPPDATA\dumpie"
+```
+The `PATH` entry is harmless if left, but you can remove the `...\dumpie\bin` entry from your user PATH via *Settings → Environment Variables* if you want it gone.
+The `PATH` entry is harmless if left; remove the `...\dumpie\bin` entry via *Settings → Environment Variables* if you want it gone.
+
+---
+
+## Notes & limitations
+
+- **Exit codes:** `0` if everything unpacked cleanly, `1` if any zip failed (useful for scripting).
+- **Recursion snapshot:** dumpie lists all zips *before* it starts extracting, so a zip that only appears after another is unpacked is not pulled into the same run. Run it again to catch those.
+- **Long paths (Windows):** very deeply nested archives can exceed the legacy 260-character path limit on older Windows configurations. If you hit this, enable long-path support in Windows, or extract closer to the drive root.
+- **Re-running is safe.** dumpie ignores its own `_dumped/` archives, so pointing it at an already-processed folder only picks up zips you've added since (or ones that failed last time).
+- **Collisions never overwrite.** Modular destinations that already exist get a numbered variant (`alpha/` → `alpha_2/`); flat/flatten files get a numbered variant (`a.png` → `a_2.png`).
+- **Recursion snapshot:** dumpie lists all zips *before* it starts, so a zip that only appears after another is unpacked is not pulled into the same run. Run it again to catch those.
+- **Long paths (Windows):** very deeply nested archives can exceed the legacy 260-character path limit on older Windows configurations. Enable long-path support, or extract closer to the drive root.
+- **Supported archives:** `.zip` only. No `.7z` / `.rar` / `.tar` (yet).
+
+---
+
+## Development
+
+The program is developed as a small package under `src/dumpie/` (one module per concern: `cli`, `menu`, `extract`, `flatten`, `fsutil`, `ui`). What ships is a single file — `build.py` amalgamates the package into the root `dumpie` script and embeds th
+at same source into both installers, so source, script, and installers never drift.
+
+```bash
+python build.py                  # rebuild dumpie + installers from src/
+uv run --group dev pytest -q     # run the test suite
+```
+
+A test asserts the installers contain the current amalgamated source, so it fails if you edit `src/dumpie/` without re-running `build.py`.
+
+Final verification — re-run the suite and exercise the real behaviors end-to-end through the generated single-file script (modular, then post-hoc flatten, then a dry-run):
+
+  Ran 1 shell command
+
+Tests are green (28 passed). The E2E failures are purely my shell harness mixing Git-Bash /tmp paths with the Windows Python interpreter — not a product issue. Let me redo it with repo-relative paths so both worlds agree.
+
+  Ran 1 shell command
+
+Everything works exactly as specified. Marking the remaining task complete.
+
+Done. Here's what's built and verified.
+
+What dumpie does now
+
+Run dumpie → greeting → a four-line menu, and the menu is the whole experience:
+
+   1  flat dumpie     unpack everything into the folder, no subfolders
+   2  modular dumpie  a folder per zip — keeps structure
+   3  options
+   q  quit
+
+- Flat — every file lands loose in the folder, internal folders stripped. Colliding names auto-number (a.png → a_2.png), so nothing is ever overwritten.
+- Modular — today's behavior, untouched: a folder per zip, structure kept.
+- Options — the niche stuff off the surface: flatten an existing directory (for "ran modular, changed my mind") + about.
+- Originals always swept to _dumped/; corrupt zips left in place; _dumped/ never touched by a flatten.
+
+Verified live through the shipped script: modular kept structure, post-hoc flatten collapsed two a.txt files to a.txt + a_2.txt (nothing lost) and pruned 4 emptied folders while preserving _dumped/, and dry-run wrote nothing.
+
+How it's built
+
+- Clean modules under src/dumpie/ — cli, menu, extract, flatten, fsutil, ui — one concern each, for the migration into your larger codebase.
+- build.py bakes those modules into the single dumpie file and re-embeds that exact source into both installers. Install stays one step, the command stays plain dumpie — none of the module split leaks into how it installs or runs.
+- A test asserts the installers contain the current source, so source/script/installers can't silently drift.
+
+Verification
+
+- 28 tests pass (uv run --group dev pytest -q): name allocation, modular, flat, cross-zip collisions, corrupt-zip handling, post-hoc flatten, _dumped preservation, dry-run, CLI dispatch, and a subprocess round-trip that runs the generated dumpie end-to-end.
+- Stale flat/ copy removed; README rewritten for the menu and corrected to the real installer filenames.
+
+The flags exist for scripting but are a documented footnote — default dumpie is the menu, full stop. Nothing was stripped.
+
+Two notes for you:
+- I did not commit anything — working tree only, per your call on when to commit.
+- I skipped the formal written spec doc and went straight to building, since you'd said start. If you want that design captured as a doc for the migration, say the word and I'll write it.
+
+✻ Worked for 11m 12s
+
+※ recap: You wanted dumpie's flatten feature and a menu-driven surface for PC enthusiasts. That's built, tested (28 passing), and verified end-to-end. Next action: tell me whether to commit the changes, since I've left everything in the working tree. (disable recaps in /config)

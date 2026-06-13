@@ -1,9 +1,18 @@
 [project]
 name = "unpackzip"
-version = "0.1.0"
-description = "Add your description here"
+version = "0.2.0"
+description = "Interactive CLI that unpacks every zip under a folder — flat or modular — then quarantines the originals."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "rich>=15.0.0",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "."]
+testpaths = ["tests"]
